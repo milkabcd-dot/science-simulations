@@ -68,7 +68,7 @@ function act(k,to){
   if(!ok){msg=NAME[k]+(to==='water'?' כבר הותך – נסו להקפיא אותו או בחרו את הגוף השני.':' כבר במצב מוצק – נסו להתיך אותו.');SND.no();return render();}
   items[k]=to;
   done[to==='water'?'melt':'freeze']=true;
-  const r={k,act:to==='water'?'התכה (חימום)':'הקפאה',b:M[k],a:M[k]};
+  const r={k,act:to==='water'?'התכה':'הקפאה',b:M[k],a:M[k]};
   rows.push(r);last={k,t:'act',r};msg="";to==='water'?SND.melt():SND.freeze();check();render();
 }
 function tbl(){
