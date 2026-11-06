@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>מעבדת מדידה – האם התכה והקפאה משנות את המסה?</title>
+<style>
+:root{--bg:#f5f8fb;--card:#fff;--ink:#1c2b36;--mut:#5b6b78;--line:#d5dee6;--pri:#1f6fb2;--priInk:#fff;--ok:#1d7a46;--warn:#b25b1f;--ice:#e3f2fc;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10181f;--card:#18232c;--ink:#e6eef4;--mut:#9fb0be;--line:#2c3b47;--pri:#5aa8e6;--priInk:#08202f;--ok:#58c785;--warn:#e8a15f;--ice:#1d3447}}
+:root[data-theme="dark"]{--bg:#10181f;--card:#18232c;--ink:#e6eef4;--mut:#9fb0be;--line:#2c3b47;--pri:#5aa8e6;--priInk:#08202f;--ok:#58c785;--warn:#e8a15f;--ice:#1d3447}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Heebo","Segoe UI",Arial,sans-serif;line-height:1.6}
+main{max-width:760px;margin:0 auto;padding:16px}
+.prog{color:var(--mut);font-size:.9rem;margin-bottom:6px}
+.bar{height:6px;background:var(--line);border-radius:3px;margin-bottom:14px}
+.bar i{display:block;height:100%;background:var(--pri);border-radius:3px;transition:width .3s}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+h1,h2,h3{margin:.2em 0 .5em}
+h1{font-size:1.35rem}h2{font-size:1.15rem}h3{font-size:1rem;color:var(--mut)}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px}
+button.pri{background:var(--pri);color:var(--priInk);border-color:var(--pri);font-weight:600}
+button:disabled{opacity:.45;cursor:not-allowed}
+.opt{display:block;width:100%;text-align:start;margin:8px 0}
+.opt.sel{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri) inset}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.zone{border:2px dashed var(--line);border-radius:12px;padding:10px;min-height:110px;text-align:center}
+.zone h3{margin:0 0 6px}
+.item{font-size:1rem;background:var(--ice);border:2px solid var(--pri);min-width:92px;padding:8px}
+.item .e{font-size:2rem;display:block}
+.disp{font-size:1.8rem;font-weight:700;direction:ltr}
+.msg{min-height:1.6em;color:var(--warn);margin:6px 0}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:center}
+th{background:var(--ice)}
+.nav{display:flex;justify-content:space-between;gap:10px}
+.note{background:var(--ice);border-radius:10px;padding:10px 12px;font-size:.92rem}
+.credit{text-align:center;color:var(--mut);font-size:.8rem;margin:10px 0 0}.good{color:var(--ok);font-weight:600}.tasks{list-style:none;padding:0;margin:8px 0}.tasks li{margin:4px 0}.zone button{margin:3px}
+</style>
+</head>
+<body>
+<main>
+<div class="prog" id="prog"></div>
+<div class="bar"><i id="barfill"></i></div>
+<div id="view"></div>
+<div class="nav"><button id="back">חזרה</button><button class="pri" id="next">המשך</button></div>
+<p class="credit"><button id="snd" onclick="sndOn=!sndOn;this.textContent=sndOn?'🔊 צלילים פועלים':'🔇 צלילים כבויים';SND.tap()">🔊 צלילים פועלים</button></p><p class="credit">נוצר על ידי: מילכה ברקו גרש</p></main>
+<script>
+const TOTAL=5;
+let step=1,hyp=null,obs=null,rows=[],msg="";
+let items,done,last,cel;
+const M={A:80,B:200};
+let sndOn=true,ac;
+function tone(f,d,t,w,v){if(!sndOn)return;try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain(),T=ac.currentTime+(w||0);o.type=t||'sine';o.frequency.value=f;g.gain.setValueAtTime(v||.15,T);g.gain.exponentialRampToValueAtTime(.001,T+d);o.connect(g);g.connect(ac.destination);o.start(T);o.stop(T+d)}catch(e){}}
+const SND={tap:()=>tone(520,.07),weigh:()=>{tone(880,.12);tone(1100,.16,'sine',.12)},melt:()=>{tone(700,.2,'triangle');tone(500,.2,'triangle',.18);tone(350,.3,'triangle',.36)},freeze:()=>{tone(500,.14,'square',0,.06);tone(800,.14,'square',.12,.06);tone(1200,.25,'square',.24,.06)},win:()=>[523,659,784,1046].forEach((f,i)=>tone(f,.25,'sine',i*.13)),no:()=>tone(200,.2,'sawtooth',0,.08)};
+function reset(){step=1;hyp=null;obs=null;rows=[];msg="";items={A:'ice',B:'ice'};done={wA:false,wB:false,melt:false,freeze:false};last=null;cel=false;}
+reset();
+const NAME={A:'גוף א׳',B:'גוף ב׳'};
+const DESC={A:'גוף קטן',B:'גוף גדול'};
+const HYP={up:'המסה תגדל',down:'המסה תקטן',same:'המסה תישאר זהה'};
+const $=id=>document.getElementById(id);
+function hasBoth(){return done.wA&&done.wB&&done.melt&&done.freeze;}
+function check(){if(hasBoth()&&!cel){cel=true;setTimeout(SND.win,500);}}
+function weigh(k){done['w'+k]=true;last={k,t:'weigh',b:M[k]};msg="";SND.weigh();check();render();}
+function act(k,to){
+  const ok=(to==='water'&&items[k]==='ice')||(to==='ice'&&items[k]==='water');
+  if(!ok){msg=NAME[k]+(to==='water'?' כבר הותך – נסו להקפיא אותו או בחרו את הגוף השני.':' כבר במצב מוצק – נסו להתיך אותו.');SND.no();return render();}
+  items[k]=to;
+  done[to==='water'?'melt':'freeze']=true;
+  const r={k,act:to==='water'?'התכה (חימום)':'הקפאה',b:M[k],a:M[k]};
+  rows.push(r);last={k,t:'act',r};msg="";to==='water'?SND.melt():SND.freeze();check();render();
+}
+function tbl(){
+  if(!rows.length)return '<p class="note">הטבלה תתמלא אוטומטית אחרי כל התכה או הקפאה.</p>';
+  return `<table><tr><th>גוף</th><th>מה נעשה בו</th><th>מסה לפני (גרם)</th><th>מסה אחרי (גרם)</th></tr>`+rows.map(r=>`<tr><td>${NAME[r.k]}</td><td>${r.act}</td><td>${r.b.toFixed(1)}</td><td>${r.a.toFixed(1)}</td></tr>`).join('')+'</table>';
+}
+function card(k){
+  const ice=items[k]==='ice';
+  return `<div class="zone"><span style="font-size:${k==='A'?'2rem':'3.6rem'};display:block;line-height:1.2">${ice?'🧊':'💧'}</span><h3>${NAME[k]} – ${DESC[k]}<br>כרגע: ${ice?'מוצק':'נוזל'}<br>מים במצב ${ice?'מוצק':'נוזל'}</h3>
+  <button onclick="weigh('${k}')">⚖️ בדקו את המסה בעזרת מאזניים</button>
+  <button onclick="act('${k}','water')" ${ice?'':'disabled'}>🔥 התיכו</button>
+  <button onclick="act('${k}','ice')" ${ice?'disabled':''}>❄️ הקפיאו</button></div>`;
+}
+function task(ok,t){return `<li class="${ok?'good':''}">${ok?'✅':'⬜'} ${t}</li>`;}
+function scaleBox(){
+  if(!last)return '<div class="disp">— g</div><small>לחצו על ⚖️ בדקו את המסה בעזרת מאזניים</small>';
+  if(last.t==='weigh')return `<small>${NAME[last.k]}</small><div class="disp">${last.b.toFixed(1)} g</div>`;
+  const r=last.r;return `<small>${NAME[r.k]}: ${r.act}</small><div class="disp">לפני: ${r.b.toFixed(1)} g<br>אחרי: ${r.a.toFixed(1)} g</div>`;
+}
+function view(){
+  if(step===1)return `<div class="card"><h1>שאלת החקר</h1><p>בבית ובתעשייה גופים של מים במצב מוצק הותכו, ומים במצב נוזל הוקפאו. <b>האם התכה או הקפאה משנות את המסה של הגוף?</b></p><p>במעבדה יש שני גופים שונים של מים במצב מוצק: גוף קטן (גוף א׳) וגוף גדול (גוף ב׳). כל אחד סגור באריזה אטומה. נמדוד את המסה לפני ואחרי כל שינוי, ונבדוק מה הנתונים אומרים.</p><div class="note"><b>מה נעשה?</b><ol><li>נכתוב השערה.</li><li>במעבדה נשקול, נתיך ונקפיא גופים.</li><li>נסתכל בטבלה ונענה מה קרה למסה.</li><li>נחזור להשערה ונסיק מסקנה.</li></ol></div></div>`;
+  if(step===2)return `<div class="card"><h1>לפני שמתחילים: מה לדעתכם יקרה?</h1><p class="note">זו השערה – אין כאן תשובה נכונה או לא נכונה. נחזור אליה בסוף.</p><p><b>המסה של גוף לאחר התכה או הקפאה:</b></p>${Object.entries(HYP).map(([v,t])=>`<button class="opt ${hyp===v?'sel':''}" onclick="hyp='${v}';render()">${t}</button>`).join('')}</div>`;
+  if(step===3)return `<div class="card"><h2>המעבדה – מה עושים?</h2>
+    <p>לכל גוף יש שלושה כפתורים. השתמשו בהם כדי לבצע את המשימות, והסתכלו מה קורה לטבלה:</p>
+    <ul class="tasks">${task(done.wA&&done.wB,'בדקו את המסה של שני הגופים בעזרת מאזניים')}${task(done.melt,'התיכו גוף מוצק: לחצו על 🔥 התיכו')}${task(done.freeze,'הקפיאו גוף שהותך (מים במצב נוזל): לחצו על ❄️ הקפיאו')}</ul>
+    <div class="grid">${card('A')}${card('B')}</div>
+    <div class="zone" style="margin-top:12px"><h3>מאזניים</h3>${scaleBox()}</div>
+    <div class="msg">${msg}</div>
+    <h3>טבלת הנתונים</h3>${tbl()}
+    ${hasBoth()?'<p class="good">כל הכבוד! סיימתם את כל המשימות. לחצו על המשך.</p>':''}</div>`;
+  if(step===4)return `<div class="card"><h2>מה הנתונים מראים?</h2>${tbl()}<p>הסתכלו בעמודות המסה. מה קרה למסה בכל התכה והקפאה?</p>
+    <button class="opt ${obs==='same'?'sel':''}" onclick="obs='same';render()">המסה נשארה זהה לפני ואחרי</button>
+    <button class="opt ${obs==='diff'?'sel':''}" onclick="obs='diff';render()">המסה השתנתה</button></div>`;
+  const ok=obs==='same';
+  return `<div class="card"><h2>מסקנה: חוזרים להשערה</h2>
+  <p>ההשערה שלכם: <b>${HYP[hyp]||'לא נבחרה'}</b>.</p>
+  ${ok?'<p><b>מה הנתונים מראים:</b> המסה של כל גוף נשארה זהה לפני ואחרי – גוף א׳ 80 גרם וגוף ב׳ 200 גרם, למרות ששני הגופים שונים. התכה והקפאה הן <b>שינויי מצב צבירה</b>: החומר עובר ממוצק לנוזל ולהפך, אבל כמות החומר לא משתנה, ולכן המסה נשמרת.</p>':'<p class="msg">שימו לב: בטבלה המסה לפני ואחרי זהה בכל השורות. חזרו לשלב הקודם ובדקו שוב את העמודות.</p>'}
+  ${ok&&hyp==='same'?'<p class="good">ההשערה שלכם נתמכה בנתונים!</p>':ok?'<p>הנתונים לא תמכו בהשערה שלכם – וזה בסדר גמור, כך עובד מדע: מעדכנים את ההבנה לפי הנתונים.</p>':''}
+  ${ok?'<div class="note"><b>שימו לב:</b> הנתונים תומכים במסקנה בניסוי שלנו, שבו הגופים היו באריזה אטומה. אם גוף מים במצב מוצק הותך בכלי פתוח, חלק מהמים עלול להתאדות והמסה הנמדדת תקטן. כדי להרחיב את המסקנה, צריך לבדוק עוד חומרים ועוד שינויים.</div>':''}
+  <p><button onclick="reset();render()">התחלה מחדש</button></p></div>`;
+}
+function render(){
+  $('view').innerHTML=view();
+  $('prog').textContent=`שלב ${step} מתוך ${TOTAL}`;
+  $('barfill').style.width=(step/TOTAL*100)+'%';
+  $('back').style.visibility=step>1?'visible':'hidden';
+  const n=$('next');n.style.visibility=step<TOTAL?'visible':'hidden';
+  n.disabled=(step===2&&!hyp)||(step===3&&!hasBoth())||(step===4&&!obs);
+  n.title=n.disabled&&step===3?'בצעו לפחות התכה אחת והקפאה אחת':'';
+}
+$('next').onclick=()=>{SND.tap();step++;render();window.scrollTo(0,0)};
+$('back').onclick=()=>{SND.tap();step--;render();window.scrollTo(0,0)};
+render();
+</script>
+</body>
+</html>
